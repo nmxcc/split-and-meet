@@ -29,6 +29,7 @@ const html = (value) => String(value).replace(/[&<>"']/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[char]));
 const money = (value, currency = 'HKD') => (currency === 'CNY' ? '¥' : 'HK$') + Number(value).toLocaleString('en-HK', { maximumFractionDigits: 2 });
+const ATTENDANCE_DEPOSIT = 20;
 const tenPercent = (foodPrice) => Math.round(Math.round(foodPrice * 100) / 10) / 100;
 const cost = (plan, value = plan.price) => money(value, plan.currency);
 const allPlans = () => [...state.posted, ...samplePlans];
@@ -104,11 +105,10 @@ function detail(plan) {
 }
 
 function confirm(plan) {
-  const refund = tenPercent(plan.price);
   panel(`${back('detail/' + plan.id, 'Plan details')}<p class="eyebrow">Pre-purchase agreement</p>
     <h1>Confirm your plan</h1><p class="muted">Review the proposed split and meetup before confirming. This prototype simulates the host accepting; it does not contact a real person.</p>
-    ${summary([['Plan', plan.name], ['Your share', plan.portion + ' · ' + cost(plan)], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Attendance deposit', cost(plan, refund * 2)]])}
-    <p class="muted">The demo simulates both participants’ deposits. After check-in, 10% of the food price is returned to you and 10% goes to the platform. Pay the merchant separately after you receive your share.</p>
+    ${summary([['Plan', plan.name], ['Your share', plan.portion + ' · ' + cost(plan)], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Attendance deposit', cost(plan, ATTENDANCE_DEPOSIT)]])}
+    <p class="muted">The demo simulates both participants’ deposits. After check-in, only the platform fee (10% of the food price) is refundable. Pay the merchant separately after you receive your share.</p>
     <div class="actions"><button class="button" id="confirm-plan" type="button">Confirm plan · simulate deposit</button></div>`);
   document.querySelector('#confirm-plan').addEventListener('click', () => {
     state.bookings.set(plan.id, 'check-in'); persist();
@@ -131,7 +131,7 @@ function pay(plan) {
   const fee = tenPercent(plan.price);
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Food received</p>
     <h1>Review your deposit</h1>
-    ${summary([['Deposit', cost(plan, fee * 2)], ['Fee (10% of food share)', '−' + cost(plan, fee)], ['Amount to Receive', cost(plan, fee)]])}
+    ${summary([['Deposit', cost(plan, ATTENDANCE_DEPOSIT)], ['Platform Fee (10%, refundable)', cost(plan, fee)], ['Amount to Receive', cost(plan, fee)]])}
     <div class="actions"><button class="button" id="review-deposit" type="button">View share receipt</button></div>`);
   document.querySelector('#review-deposit').addEventListener('click', () => {
     state.bookings.set(plan.id, 'complete'); persist();
@@ -143,7 +143,7 @@ function complete(plan) {
   const refunded = state.refunded.has(plan.id);
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Completed share</p>
     <h1>Share receipt</h1><p>You received your share of <strong>${html(plan.name)}</strong> and both participants checked in.</p>
-    ${summary([['Food payment to merchant', cost(plan)], ['Fee (10% of food share)', cost(plan, tenPercent(plan.price))]])}
+    ${summary([['Food payment to merchant', cost(plan)], ['Platform Fee (10%, refundable)', cost(plan, tenPercent(plan.price))]])}
     <p class="muted">This receipt uses simulated payments.</p>
     <div class="actions">${refunded ? button('Back to My plans', 'plans')
       : '<button class="button" id="return-deposit" type="button">Return Deposit and Go Back</button>'}</div>`);
