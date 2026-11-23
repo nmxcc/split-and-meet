@@ -146,7 +146,7 @@ function detail(plan) {
     ${plan.id === 'dim-sum' ? '<div class="meal-photo" role="img" aria-label="Hong Kong dim sum in bamboo steamers"></div>' : ''}
     ${summary([['Full order', plan.total], ['Your share', plan.portion + ' · ' + money(plan.price)], ['Meet at', plan.location], ['Time', meeting(plan)]])}
     <div class="actions">${own ? button('Back to My plans', 'plans') : stage
-      ? button(stage === 'complete' ? 'View check-in receipt' : 'View confirmed plan', stage + '/' + plan.id)
+      ? button('View in My plans', 'plans')
       : button('Request this share →', 'confirm/' + plan.id)}</div>`);
 }
 
@@ -154,20 +154,32 @@ function confirm(plan) {
   panel(`${back('detail/' + plan.id, 'Plan details')}<p class="eyebrow">Pre-purchase agreement</p>
     <h1>Confirm your plan</h1><p class="muted">The host has agreed to the split. Confirm your portion and meetup details before buying.</p>
     ${summary([['Plan', plan.name], ['Your share', plan.portion + ' · ' + money(plan.price)], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Attendance deposit', 'HK$10']])}
-    <p class="muted">The demo simulates the deposit. After both participants check in, HK$9 is returned and HK$1 is the platform fee. Pay the merchant for food separately.</p>
+    <p class="muted">The demo simulates both participants’ deposits. After both check in, HK$9 of your deposit is returned and HK$1 is the platform fee. Pay the merchant separately after you receive your share.</p>
     <div class="actions"><button class="button" id="confirm-plan" type="button">Confirm &amp; simulate deposit</button></div>`);
   document.querySelector('#confirm-plan').addEventListener('click', () => {
     state.bookings.set(plan.id, 'check-in');
-    location.hash = '#check-in/' + plan.id;
+    location.hash = '#plans';
   });
 }
 
 function checkIn(plan) {
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Confirmed meetup</p>
-    <h1>Ready to check in</h1><p class="muted">Meet up and share your order. The other participant’s arrival is simulated for this demo.</p>
+    <h1>Collect your share</h1><p class="muted">Check in once you’ve received your food. Then pay the merchant for your share.</p>
     ${summary([['Plan', plan.name], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Your portion', plan.portion], ['Other participant', 'Checked in']])}
-    <div class="actions"><button class="button" id="check-in" type="button">Check in</button></div>`);
+    <div class="actions"><button class="button" id="check-in" type="button">Check in and confirm receipt</button></div>`);
   document.querySelector('#check-in').addEventListener('click', () => {
+    state.bookings.set(plan.id, 'pay');
+    location.hash = '#pay/' + plan.id;
+  });
+}
+
+function pay(plan) {
+  panel(`${back('plans', 'My plans')}<p class="eyebrow">Food received</p>
+    <h1>Pay for your share</h1>
+    ${summary([['Plan', plan.name], ['Food payment to merchant', money(plan.price)]])}
+    <p class="muted">This demo simulates the food payment. Your attendance deposit is handled separately.</p>
+    <div class="actions"><button class="button" id="pay-for-share" type="button">Simulate payment of ${money(plan.price)}</button></div>`);
+  document.querySelector('#pay-for-share').addEventListener('click', () => {
     state.bookings.set(plan.id, 'complete');
     location.hash = '#complete/' + plan.id;
   });
@@ -175,18 +187,20 @@ function checkIn(plan) {
 
 function complete(plan) {
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Completed share</p>
-    <h1>Check-in receipt</h1><p>Both participants checked in for <strong>${html(plan.name)}</strong>.</p>
-    ${summary([['Your attendance deposit', 'HK$10'], ['Platform fee', 'HK$1'], ['Returned to you', 'HK$9']])}
-    <p class="muted">The food payment of ${money(plan.price)} is separate. This receipt uses simulated payments.</p>
+    <h1>Share receipt</h1><p>You received your share of <strong>${html(plan.name)}</strong> and both participants checked in.</p>
+    ${summary([['Food payment to merchant', money(plan.price)], ['Your attendance deposit', 'HK$10'], ['Platform fee', 'HK$1'], ['Returned to you', 'HK$9']])}
+    <p class="muted">This receipt uses simulated payments.</p>
     <div class="actions">${button('Back to My plans', 'plans')}</div>`);
 }
 
 function myPlans() {
   const booked = [...state.bookings].map(([id, stage]) => {
     const plan = allPlans().find((item) => item.id === id);
-    return `<article class="card"><span class="tag">${stage === 'complete' ? 'Completed' : 'Confirmed'}</span>
+    const status = { 'check-in': 'Deposit confirmed', pay: 'Food received · Payment due', complete: 'Completed' };
+    const action = { 'check-in': 'Open meetup', pay: 'Pay for your share', complete: 'View receipt' };
+    return `<article class="card"><span class="tag">${status[stage]}</span>
       <h3>${html(plan.name)}</h3><p class="muted">${html(plan.area)} · ${html(meeting(plan))}</p>
-      <a href="#${stage}/${id}">${stage === 'complete' ? 'View receipt' : 'Open meetup'} →</a></article>`;
+      <a href="#${stage}/${id}">${action[stage]} →</a></article>`;
   });
   panel(`<h1>My plans</h1><p class="muted">Your demo bookings and posted shares.</p>
     <div class="plan-list">${[...booked, ...state.posted.map(card)].join('') ||
@@ -224,7 +238,7 @@ function render() {
   const [route, id] = location.hash.slice(1).split('/');
   const plan = allPlans().find((item) => item.id === id);
   document.querySelectorAll('[data-nav]').forEach((link) => {
-    const activeTab = route === 'post' ? 'post' : ['plans', 'complete', 'check-in'].includes(route) ? 'plans' : 'explore';
+    const activeTab = route === 'post' ? 'post' : ['plans', 'complete', 'check-in', 'pay'].includes(route) ? 'plans' : 'explore';
     if (link.dataset.nav === activeTab) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
@@ -234,6 +248,7 @@ function render() {
   else if (route === 'detail' && plan) detail(plan);
   else if (route === 'confirm' && plan && !id.startsWith('posted-') && !stage) confirm(plan);
   else if (route === 'check-in' && plan && stage === 'check-in') checkIn(plan);
+  else if (route === 'pay' && plan && stage === 'pay') pay(plan);
   else if (route === 'complete' && plan && stage === 'complete') complete(plan);
   else if (plan) detail(plan);
   else explore();
