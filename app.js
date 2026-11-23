@@ -156,7 +156,7 @@ function confirm(plan) {
   panel(`${back('detail/' + plan.id, 'Plan details')}<p class="eyebrow">Pre-purchase agreement</p>
     <h1>Confirm your plan</h1><p class="muted">The host has agreed to the split. Confirm your portion and meetup details before buying.</p>
     ${summary([['Plan', plan.name], ['Your share', plan.portion + ' · ' + money(plan.price)], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Attendance deposit', money(refund * 2)]])}
-    <p class="muted">The demo simulates both participants’ deposits. After check-in and payment, 10% of the food price is returned to you and 10% goes to the platform. Pay the merchant separately after you receive your share.</p>
+    <p class="muted">The demo simulates both participants’ deposits. After check-in, 10% of the food price is returned to you and 10% goes to the platform. Pay the merchant separately after you receive your share.</p>
     <div class="actions"><button class="button" id="confirm-plan" type="button">Confirm &amp; simulate deposit</button></div>`);
   document.querySelector('#confirm-plan').addEventListener('click', () => {
     state.bookings.set(plan.id, 'check-in');
@@ -166,7 +166,7 @@ function confirm(plan) {
 
 function checkIn(plan) {
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Confirmed meetup</p>
-    <h1>Collect your share</h1><p class="muted">Check in once you’ve received your food. Then pay the merchant for your share.</p>
+    <h1>Collect your share</h1><p class="muted">Check in once you’ve received your food. Pay the merchant separately at pickup.</p>
     ${summary([['Plan', plan.name], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Your portion', plan.portion], ['Other participant', 'Checked in']])}
     <div class="actions"><button class="button" id="check-in" type="button">Check in and confirm receipt</button></div>`);
   document.querySelector('#check-in').addEventListener('click', () => {
@@ -176,12 +176,12 @@ function checkIn(plan) {
 }
 
 function pay(plan) {
+  const fee = tenPercent(plan.price);
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Food received</p>
-    <h1>Pay for your share</h1>
-    ${summary([['Plan', plan.name], ['Food payment to merchant', money(plan.price)]])}
-    <p class="muted">This demo simulates the food payment. Your attendance deposit is handled separately.</p>
-    <div class="actions"><button class="button" id="pay-for-share" type="button">Simulate payment of ${money(plan.price)}</button></div>`);
-  document.querySelector('#pay-for-share').addEventListener('click', () => {
+    <h1>Review your deposit</h1>
+    ${summary([['Deposit', money(fee * 2)], ['Platform Fee (10%)', '−' + money(fee)], ['Amount to Receive', money(fee)]])}
+    <div class="actions"><button class="button" id="review-deposit" type="button">View share receipt</button></div>`);
+  document.querySelector('#review-deposit').addEventListener('click', () => {
     state.bookings.set(plan.id, 'complete');
     location.hash = '#complete/' + plan.id;
   });
@@ -204,8 +204,8 @@ function complete(plan) {
 function myPlans() {
   const booked = [...state.bookings].map(([id, stage]) => {
     const plan = allPlans().find((item) => item.id === id);
-    const status = { 'check-in': 'Deposit confirmed', pay: 'Food received · Payment due', complete: 'Completed' };
-    const action = { 'check-in': 'Open meetup', pay: 'Pay for your share', complete: 'View receipt' };
+    const status = { 'check-in': 'Deposit confirmed', pay: 'Food received · Deposit ready to review', complete: 'Completed' };
+    const action = { 'check-in': 'Open meetup', pay: 'Review your deposit', complete: 'View receipt' };
     return `<article class="card"><span class="tag">${status[stage]}</span>
       <h3>${html(plan.name)}</h3><p class="muted">${html(plan.area)} · ${html(meeting(plan))}</p>
       ${state.refunded.has(id) ? `<p class="muted">Deposit refund: ${money(tenPercent(plan.price))} returned (simulated)</p>` : ''}
