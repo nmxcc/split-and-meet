@@ -9,13 +9,14 @@ const mapAreas = [
   { name: 'Hang Hau', x: 53, y: 53 },
   { name: 'Tseung Kwan O', x: 28, y: 81 }
 ];
-const state = { posted: [], bookings: new Map(), query: '', day: '', mapArea: '' };
+const state = { posted: [], bookings: new Map(), refunded: new Set(), query: '', day: '', mapArea: '' };
 const main = document.querySelector('main');
 const screenScroll = document.querySelector('.screen-scroll');
 const html = (value) => String(value).replace(/[&<>"']/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[char]));
 const money = (value) => 'HK$' + Number(value).toLocaleString('en-HK', { maximumFractionDigits: 2 });
+const tenPercent = (foodPrice) => Math.round(Math.round(foodPrice * 100) / 10) / 100;
 const allPlans = () => [...state.posted, ...samplePlans];
 const meeting = (plan) => plan.day + ' · ' + plan.time;
 const button = (label, target) => '<a class="button" href="#' + target + '">' + label + '</a>';
@@ -151,10 +152,11 @@ function detail(plan) {
 }
 
 function confirm(plan) {
+  const refund = tenPercent(plan.price);
   panel(`${back('detail/' + plan.id, 'Plan details')}<p class="eyebrow">Pre-purchase agreement</p>
     <h1>Confirm your plan</h1><p class="muted">The host has agreed to the split. Confirm your portion and meetup details before buying.</p>
-    ${summary([['Plan', plan.name], ['Your share', plan.portion + ' · ' + money(plan.price)], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Attendance deposit', 'HK$10']])}
-    <p class="muted">The demo simulates both participants’ deposits. After both check in, HK$9 of your deposit is returned and HK$1 is the platform fee. Pay the merchant separately after you receive your share.</p>
+    ${summary([['Plan', plan.name], ['Your share', plan.portion + ' · ' + money(plan.price)], ['Meetup', plan.location + ' · ' + meeting(plan)], ['Attendance deposit', money(refund * 2)]])}
+    <p class="muted">The demo simulates both participants’ deposits. After check-in and payment, 10% of the food price is returned to you and 10% goes to the platform. Pay the merchant separately after you receive your share.</p>
     <div class="actions"><button class="button" id="confirm-plan" type="button">Confirm &amp; simulate deposit</button></div>`);
   document.querySelector('#confirm-plan').addEventListener('click', () => {
     state.bookings.set(plan.id, 'check-in');
@@ -186,11 +188,17 @@ function pay(plan) {
 }
 
 function complete(plan) {
+  const refunded = state.refunded.has(plan.id);
   panel(`${back('plans', 'My plans')}<p class="eyebrow">Completed share</p>
     <h1>Share receipt</h1><p>You received your share of <strong>${html(plan.name)}</strong> and both participants checked in.</p>
-    ${summary([['Food payment to merchant', money(plan.price)], ['Your attendance deposit', 'HK$10'], ['Platform fee', 'HK$1'], ['Returned to you', 'HK$9']])}
+    ${summary([['Food payment to merchant', money(plan.price)], ['Platform fee (10%)', money(tenPercent(plan.price))]])}
     <p class="muted">This receipt uses simulated payments.</p>
-    <div class="actions">${button('Back to My plans', 'plans')}</div>`);
+    <div class="actions">${refunded ? button('Back to My plans', 'plans')
+      : '<button class="button" id="return-deposit" type="button">Return Deposit and Go Back</button>'}</div>`);
+  document.querySelector('#return-deposit')?.addEventListener('click', () => {
+    state.refunded.add(plan.id);
+    location.hash = '#plans';
+  });
 }
 
 function myPlans() {
@@ -200,6 +208,7 @@ function myPlans() {
     const action = { 'check-in': 'Open meetup', pay: 'Pay for your share', complete: 'View receipt' };
     return `<article class="card"><span class="tag">${status[stage]}</span>
       <h3>${html(plan.name)}</h3><p class="muted">${html(plan.area)} · ${html(meeting(plan))}</p>
+      ${state.refunded.has(id) ? `<p class="muted">Deposit refund: ${money(tenPercent(plan.price))} returned (simulated)</p>` : ''}
       <a href="#${stage}/${id}">${action[stage]} →</a></article>`;
   });
   panel(`<h1>My plans</h1><p class="muted">Your demo bookings and posted shares.</p>
@@ -267,6 +276,7 @@ window.addEventListener('hashchange', () => {
 
 document.querySelector('#reset').addEventListener('click', () => {
   state.bookings.clear();
+  state.refunded.clear();
   state.posted = [];
   state.query = '';
   state.day = '';
